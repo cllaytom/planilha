@@ -1,55 +1,20 @@
 (() => {
-  const original = window.fetch.bind(window);
-  const modal = document.getElementById('modalNovoCliente');
-  if (!modal) return;
-  const campo = document.createElement('div');
-  campo.innerHTML = '<label for="quantidadeAcessos">Quantidade de acessos</label><input id="quantidadeAcessos" type="number" min="1" step="1" value="1"><small>Multiplica somente o custo do produto. O valor de venda continua sendo o total informado.</small>';
-  modal.querySelector('.rodape').before(campo);
-  const input = campo.querySelector('input');
-  let ultimoCliente = null;
-  new MutationObserver(() => {
-    if (!modal.classList.contains('aberto')) return;
-    input.value = /novo/i.test(document.getElementById('tituloCliente').textContent) ? 1 : (ultimoCliente?.conexoes || 1);
-  }).observe(modal, {attributes:true, attributeFilter:['class']});
-  window.fetch = async function(resource, options) {
-    const req = resource instanceof Request;
-    const url = new URL(typeof resource === 'string' ? resource : (req ? resource.url : String(resource)), location.href);
-    const path = url.pathname.replace(/\/$/, '');
-    const method = (options?.method || (req ? resource.method : 'GET')).toUpperCase();
-    let opts = options;
-    if ((method === 'POST' && path === '/assinaturas') || (method === 'PATCH' && /^\/assinaturas\/\d+$/.test(path) && modal.classList.contains('aberto'))) {
-      const n = Number(input.value);
-      if (!Number.isInteger(n) || n < 1) throw Error('Informe uma quantidade inteira de acessos, maior que zero.');
-      if (typeof options?.body !== 'string') throw Error('Nao foi possivel ler os dados do cliente.');
-      const payload = JSON.parse(options.body);
-      payload.conexoes = n;
-      const select = document.getElementById('novoPlano');
-      const escolhido = select?.value || '';
-      const rotulo = select?.selectedOptions[0]?.textContent?.trim() || '';
-      if (method === 'POST' || escolhido) {
-        const r = await original('/planos?apenas_ativos=true', {headers:{'X-API-Key':localStorage.getItem('assinaturas.apiKey') || ''}});
-        if (!r.ok) throw Error('Nao foi possivel consultar os planos. Nenhum cliente foi criado.');
-        const planos = await r.json();
-        const plano = planos.find(p => String(p.id) === escolhido || p.nome === escolhido)
-          || planos.find(p => rotulo === p.nome || rotulo.startsWith(p.nome + ' — ') || rotulo.startsWith(p.nome + ' - '));
-        if (!plano) throw Error('Selecione um plano ativo valido antes de salvar. Nenhum dado do cliente foi salvo.');
-        if (!plano.produto) throw Error('Este plano esta sem produto. Vincule um produto em Planos antes de salvar o cliente.');
-        payload.plano_id = plano.id;
-        payload.plano_nome = plano.nome;
-        payload.produto = plano.produto;
-      }
-      opts = {...options, body:JSON.stringify(payload)};
-    }
-    let target = resource;
-    if (method === 'GET' && path === '/planos') {
-      url.searchParams.set('apenas_ativos','true');
-      target = req ? new Request(url.toString(), resource) : url.toString();
-    }
-    const response = await original(target, opts);
-    if (method === 'GET' && /^\/assinaturas\/\d+$/.test(path) && response.ok) {
-      ultimoCliente = await response.clone().json();
-      if (modal.classList.contains('aberto') && !/novo/i.test(document.getElementById('tituloCliente').textContent)) input.value = ultimoCliente.conexoes || 1;
-    }
-    return response;
-  };
+ const modal=document.getElementById('modalNovoCliente');if(!modal)return;
+ const fetchOriginal=window.fetch.bind(window),$=id=>document.getElementById(id);
+ const bloco=document.createElement('div');bloco.innerHTML='<label for="clienteProduto">Produto *</label><select id="clienteProduto"><option value="">Selecione um produto</option></select><label for="quantidadeAcessos">Quantidade de acessos</label><input id="quantidadeAcessos" type="number" min="1" step="1" value="1"><small>O custo do produto é multiplicado pelos acessos. O preço de venda é o total informado.</small><p id="avisoProduto" role="status"></p>';
+ $('novoPlano').closest('.linha-campos').before(bloco);
+ document.querySelector('label[for="novoPlano"]').textContent='Plano (opcional)';
+ let produtos=[],planos=[],cliente=null,pronto=false,mudou=false,geracao=0;
+ async function ler(url){const r=await fetchOriginal(url,{headers:{'X-API-Key':localStorage.getItem('assinaturas.apiKey')||''}});if(!r.ok)throw Error('Não foi possível carregar produtos ou planos.');return r.json()}
+ function op(select,valor,texto){const o=document.createElement('option');o.value=valor;o.textContent=texto;select.appendChild(o)}
+ function planosDoProduto(selecionado=''){$('novoPlano').replaceChildren();op($('novoPlano'),'','Sem plano — definir valor manualmente');for(const p of planos.filter(p=>p.produto===$('clienteProduto').value))op($('novoPlano'),String(p.id),p.nome+' — '+Number(p.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}));if(cliente&&String(cliente.plano_id)===String(selecionado)&&!planos.some(p=>String(p.id)===String(selecionado))){op($('novoPlano'),String(selecionado),cliente.plano_nome+' (histórico)')}$('novoPlano').value=selecionado||''}
+ function vencimento(dias){const d=new Date();d.setDate(d.getDate()+Number(dias));$('novoVencimento').value=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+ $('clienteProduto').onchange=()=>{mudou=true;planosDoProduto();const p=produtos.find(p=>p.nome===$('clienteProduto').value);if(p&&!cliente)vencimento(p.dias);$('avisoProduto').textContent='Informe o valor total da venda. O plano não é obrigatório.'};
+ $('novoPlano').addEventListener('change',()=>{mudou=true;const p=planos.find(p=>String(p.id)===$('novoPlano').value);if(p){$('novoValor').value=p.valor;const produto=produtos.find(x=>x.nome===p.produto);if(!cliente)vencimento(produto?.duracao_fixa?produto.dias:p.dias)}});
+ new MutationObserver(async()=>{if(!modal.classList.contains('aberto'))return;const g=++geracao;pronto=false;mudou=false;$('avisoProduto').textContent='Carregando produtos...';try{const dados=await Promise.all([ler('/produtos?apenas_ativos=true'),ler('/planos?apenas_ativos=true')]);if(g!==geracao)return;[produtos,planos]=dados;const editando=!/novo/i.test($('tituloCliente').textContent);if(!editando)cliente=null;$('clienteProduto').replaceChildren();op($('clienteProduto'),'','Selecione um produto');for(const p of produtos)op($('clienteProduto'),p.nome,p.nome);if(cliente?.produto&&!produtos.some(p=>p.nome===cliente.produto))op($('clienteProduto'),cliente.produto,cliente.produto+' (histórico)');$('clienteProduto').value=cliente?.produto||'';$('quantidadeAcessos').value=cliente?.conexoes||1;planosDoProduto(cliente?.plano_id?String(cliente.plano_id):'');pronto=true;$('avisoProduto').textContent='Selecione o produto. Usar um plano é opcional.'}catch(e){$('avisoProduto').textContent=e.message}}).observe(modal,{attributes:true,attributeFilter:['class']});
+ window.fetch=async(resource,options)=>{const req=resource instanceof Request,url=new URL(typeof resource==='string'?resource:(req?resource.url:String(resource)),location.href),path=url.pathname.replace(/\/$/,''),method=(options?.method||(req?resource.method:'GET')).toUpperCase();let opts=options;
+ if((method==='POST'&&path==='/assinaturas')||(method==='PATCH'&&/^\/assinaturas\/\d+$/.test(path)&&modal.classList.contains('aberto'))){if(!pronto)throw Error('Espere o carregamento dos produtos antes de salvar.');const n=Number($('quantidadeAcessos').value);if(!Number.isInteger(n)||n<1)throw Error('Quantidade de acessos deve ser inteira e positiva.');const payload=JSON.parse(options.body);payload.conexoes=n;if(method==='POST'||mudou){const produto=produtos.find(p=>p.nome===$('clienteProduto').value);if(!produto)throw Error('Selecione um produto ativo antes de salvar.');const plano=planos.find(p=>String(p.id)===$('novoPlano').value&&p.produto===produto.nome);if($('novoPlano').value&&!plano)throw Error('Selecione um plano ativo deste produto ou use Sem plano.');payload.produto=produto.nome;payload.plano_id=plano?.id||null;payload.plano_nome=plano?.nome||null}else if(cliente){payload.produto=cliente.produto;payload.plano_id=cliente.plano_id;payload.plano_nome=cliente.plano_nome}opts={...options,body:JSON.stringify(payload)}}
+ let target=resource;if(method==='GET'&&path==='/planos'){url.searchParams.set('apenas_ativos','true');target=req?new Request(url.toString(),resource):url.toString()}
+ const r=await fetchOriginal(target,opts);if(method==='GET'&&/^\/assinaturas\/\d+$/.test(path)&&r.ok){cliente=await r.clone().json();if(modal.classList.contains('aberto')&&!/novo/i.test($('tituloCliente').textContent)){$('quantidadeAcessos').value=cliente.conexoes||1;if(!mudou){if(cliente.produto&&!Array.from($('clienteProduto').options).some(o=>o.value===cliente.produto))op($('clienteProduto'),cliente.produto,cliente.produto+' (histórico)');$('clienteProduto').value=cliente.produto||'';planosDoProduto(cliente.plano_id?String(cliente.plano_id):'')}}}return r;
+ };
 })();
