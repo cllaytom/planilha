@@ -1,0 +1,1396 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Assinaturas</title>
+<!--
+  ============================================================================
+  PAINEL DE ASSINATURAS - arquivo unico, sem dependencias externas.
+  Para personalizar: mexa em CONFIG (JS) e nas variaveis de cor em :root (CSS).
+  ============================================================================
+-->
+<style>
+  :root {
+    /* ---------- cores (edite aqui) ---------- */
+    --bg-1: #0d0b21;
+    --bg-2: #171240;
+    --card: #1b1740;
+    --card-alto: #221d52;
+    --borda: rgba(255, 255, 255, .09);
+    --texto: #eef0ff;
+    --texto-fraco: #9aa0c7;
+    --azul: #4f7cff;
+    --ciano: #2ad4e8;
+    --roxo: #8b5cf6;
+    --verde: #2fcf8f;
+    --amarelo: #f5b83d;
+    --vermelho: #ff5c7a;
+    --raio: 16px;
+    --sombra: 0 18px 40px rgba(0, 0, 0, .35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    color: var(--texto);
+    background:
+      radial-gradient(900px 500px at 15% -10%, rgba(79, 124, 255, .22), transparent 60%),
+      radial-gradient(800px 500px at 90% 0%, rgba(139, 92, 246, .20), transparent 55%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2) 60%, #0f0c29);
+    background-attachment: fixed;
+  }
+
+  /* ---------- cabecalho ---------- */
+  .topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 22px 28px 6px;
+    flex-wrap: wrap;
+  }
+  .topo h1 {
+    margin: 0;
+    font-size: 26px;
+    letter-spacing: .3px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .topo h1 .ponto {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--ciano);
+    box-shadow: 0 0 14px var(--ciano);
+  }
+  .topo .sub { margin: 6px 0 0 22px; color: var(--texto-fraco); font-size: 13px; }
+  .acoes { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  button, .botao {
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 10px;
+    border: 1px solid var(--borda);
+    background: rgba(255, 255, 255, .05);
+    color: var(--texto);
+    padding: 9px 16px;
+    transition: .18s ease;
+  }
+  button:hover, .botao:hover { background: rgba(255, 255, 255, .12); transform: translateY(-1px); }
+  .botao.primario { background: linear-gradient(135deg, var(--azul), var(--roxo)); border: 0; }
+  .botao.primario:hover { filter: brightness(1.12); }
+
+  main { padding: 16px 28px 36px; display: grid; gap: 16px; }
+
+  .linha { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+  .col-3 { grid-column: span 3; }
+  .col-4 { grid-column: span 4; }
+  .col-5 { grid-column: span 5; }
+  .col-7 { grid-column: span 7; }
+  .col-12 { grid-column: span 12; }
+
+  .card {
+    background: linear-gradient(160deg, var(--card), var(--card-alto));
+    border: 1px solid var(--borda);
+    border-radius: var(--raio);
+    box-shadow: var(--sombra);
+    padding: 18px 20px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .card h2 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: .4px;
+    color: var(--texto);
+  }
+  .card .nota { color: var(--texto-fraco); font-size: 12px; margin-bottom: 14px; }
+
+  /* ---------- indicadores ---------- */
+  .kpi { position: relative; overflow: hidden; }
+  .kpi.clicavel { cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s; }
+  .kpi.clicavel:hover { transform: translateY(-2px); border-color: rgba(79, 124, 255, .55); box-shadow: 0 20px 44px rgba(0, 0, 0, .45); }
+  .kpi .ver-lista {
+    position: absolute; right: 16px; bottom: 12px;
+    font-size: 11px; color: var(--texto-fraco); opacity: 0; transition: .15s;
+  }
+  .kpi.clicavel:hover .ver-lista { opacity: 1; color: #9db4ff; }
+  .kpi::before {
+    content: ""; position: absolute; inset: 0 auto 0 0; width: 4px;
+    background: var(--cor, var(--azul));
+  }
+  .kpi .rotulo { color: var(--texto-fraco); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
+  .kpi .valor { font-size: 34px; font-weight: 700; margin-top: 8px; line-height: 1; }
+  .kpi .detalhe { color: var(--texto-fraco); font-size: 12px; margin-top: 8px; }
+  .kpi.fin .valor { font-size: 27px; color: #fff; }
+
+  /* ---------- donut ---------- */
+  .donut-area { display: flex; align-items: center; gap: 18px; flex: 1; }
+  .donut {
+    position: relative;
+    width: 148px; height: 148px; flex: 0 0 148px;
+    border-radius: 50%;
+    background: conic-gradient(var(--borda) 0 360deg);
+  }
+  .donut::after {
+    content: ""; position: absolute; inset: 23%;
+    border-radius: 50%;
+    background: #1d1944;
+    box-shadow: inset 0 0 22px rgba(0, 0, 0, .45);
+  }
+  .donut .centro {
+    position: absolute; inset: 0; z-index: 2;
+    display: grid; place-content: center; text-align: center;
+  }
+  .donut .centro b { font-size: 26px; display: block; line-height: 1; }
+  .donut .centro span { font-size: 11px; color: var(--texto-fraco); }
+
+  .legenda { display: grid; gap: 8px; flex: 1; min-width: 0; }
+  .legenda .item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  .legenda .marca { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 10px; }
+  .legenda .nome { color: var(--texto-fraco); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legenda .qtd { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+  /* ---------- barras horizontais ---------- */
+  .barras { display: grid; gap: 12px; flex: 1; align-content: center; }
+  .barras .linha-barra { display: grid; grid-template-columns: 92px 1fr 34px; gap: 10px; align-items: center; font-size: 12.5px; }
+  .barras .rotulo { color: var(--texto-fraco); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barras .trilho { display: block; height: 9px; border-radius: 99px; background: rgba(255, 255, 255, .07); overflow: hidden; }
+  .barras .preenchimento { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--azul), var(--ciano)); }
+  .barras .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ---------- colunas verticais ---------- */
+  .colunas {
+    display: flex; align-items: flex-end; gap: 8px;
+    height: 168px; min-height: 168px; padding-top: 18px;
+  }
+  .colunas .coluna { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; min-width: 0; }
+  .colunas .barra {
+    width: 100%; max-width: 46px; border-radius: 8px 8px 3px 3px;
+    background: linear-gradient(180deg, var(--roxo), rgba(79, 124, 255, .55));
+    position: relative; min-height: 3px;
+    transition: height .4s ease;
+  }
+  .colunas .barra .pico {
+    position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+    font-size: 10.5px; color: var(--texto-fraco); white-space: nowrap;
+  }
+  .colunas .mes { font-size: 10.5px; color: var(--texto-fraco); white-space: nowrap; }
+
+  /* ---------- tabelas ---------- */
+  .tabela-wrap { overflow: auto; margin: -4px -6px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead th {
+    text-align: left; color: var(--texto-fraco); font-weight: 600;
+    font-size: 11px; text-transform: uppercase; letter-spacing: .7px;
+    padding: 8px 10px; border-bottom: 1px solid var(--borda); white-space: nowrap;
+  }
+  tbody td { padding: 9px 10px; border-bottom: 1px solid rgba(255, 255, 255, .05); white-space: nowrap; }
+  tbody tr:hover { background: rgba(255, 255, 255, .035); }
+  tbody tr:last-child td { border-bottom: 0; }
+  .num-tab { text-align: right; font-variant-numeric: tabular-nums; }
+  .cliente { font-weight: 600; }
+
+  .pilula {
+    display: inline-block; padding: 3px 9px; border-radius: 99px;
+    font-size: 10.5px; font-weight: 600; letter-spacing: .3px;
+  }
+  .pilula.vermelho { background: rgba(255, 92, 122, .16); color: var(--vermelho); }
+  .pilula.amarelo { background: rgba(245, 184, 61, .16); color: var(--amarelo); }
+  .pilula.verde { background: rgba(47, 207, 143, .16); color: var(--verde); }
+  .pilula.azul { background: rgba(79, 124, 255, .16); color: var(--azul); }
+  .pilula.cinza { background: rgba(154, 160, 199, .14); color: var(--texto-fraco); }
+
+  .vazio { padding: 26px 10px; text-align: center; color: var(--texto-fraco); font-size: 12.5px; }
+
+  /* ---------- gerenciar clientes ---------- */
+  .topo-secao { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .topo-secao .botao { flex: 0 0 auto; }
+  .ferramentas { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .ferramentas input[type="search"], .ferramentas select {
+    font: inherit; font-size: 13px; padding: 8px 12px; border-radius: 10px;
+    border: 1px solid var(--borda); background: rgba(0, 0, 0, .25); color: var(--texto);
+  }
+  .ferramentas input[type="search"] { flex: 1; min-width: 190px; }
+  .ferramentas input[type="search"]:focus, .ferramentas select:focus { outline: 2px solid rgba(79, 124, 255, .5); }
+  .ferramentas .contador { color: var(--texto-fraco); font-size: 12px; margin-left: auto; }
+
+  .tabela-clientes { max-height: 440px; overflow: auto; }
+  .tabela-clientes thead th { position: sticky; top: 0; background: #1e1a47; z-index: 1; }
+  .tabela-clientes td small { color: var(--texto-fraco); }
+  /* mantem a coluna de acoes sempre visivel, mesmo em tela estreita */
+  .tabela-clientes th:last-child,
+  .tabela-clientes td:last-child {
+    position: sticky; right: 0; background: #1e1a47;
+    box-shadow: -14px 0 18px -14px rgba(0, 0, 0, .95);
+  }
+  .tabela-clientes tbody tr:hover td:last-child { background: #272259; }
+
+  .acoes-linha { display: flex; gap: 6px; flex-wrap: nowrap; }
+  .btn-acao {
+    font: inherit; font-size: 11px; padding: 5px 9px; border-radius: 8px;
+    border: 1px solid var(--borda); background: rgba(255, 255, 255, .05);
+    color: var(--texto); cursor: pointer; white-space: nowrap; transition: .15s;
+  }
+  .btn-acao:hover { background: rgba(255, 255, 255, .13); }
+  .btn-acao:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-acao.renovar { color: #9db4ff; border-color: rgba(79, 124, 255, .45); }
+  .btn-acao.editar { color: #c3b2ff; border-color: rgba(160, 124, 255, .45); }
+  .btn-acao.ativar { color: var(--verde); border-color: rgba(47, 207, 143, .4); }
+  .btn-acao.suspender { color: var(--amarelo); border-color: rgba(245, 184, 61, .4); }
+  .btn-acao.excluir { color: var(--vermelho); border-color: rgba(255, 92, 122, .4); }
+  .btn-acao.zap { color: #25d366; border-color: rgba(37, 211, 102, .4); }
+
+  .paginacao {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 12px; color: var(--texto-fraco); font-size: 12px;
+  }
+  .paginacao .botoes { display: flex; gap: 8px; }
+
+  /* ---------- modais ---------- */
+  .modal {
+    position: fixed; inset: 0; z-index: 60; display: none; place-items: center;
+    background: rgba(7, 5, 20, .82); backdrop-filter: blur(6px); padding: 16px;
+  }
+  .modal.aberto { display: grid; }
+  .modal .caixa {
+    width: min(480px, 94vw);
+    max-height: 92vh; overflow-y: auto;
+    background: linear-gradient(160deg, var(--card), var(--card-alto));
+    border: 1px solid var(--borda); border-radius: var(--raio);
+    padding: 22px; box-shadow: var(--sombra);
+  }
+  .modal h3 { margin: 0 0 4px; font-size: 17px; }
+  .modal .alvo { color: var(--texto-fraco); font-size: 12.5px; margin-bottom: 6px; }
+  .modal label { display: block; font-size: 12px; color: var(--texto-fraco); margin: 14px 0 6px; }
+  .modal input, .modal select, .modal textarea {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--borda);
+    background: rgba(0, 0, 0, .25); color: var(--texto); font: inherit; font-size: 13px;
+  }
+  .modal input:focus, .modal select:focus, .modal textarea:focus { outline: 2px solid rgba(79, 124, 255, .5); }
+  .modal textarea { min-height: 210px; resize: vertical; line-height: 1.5; }
+  .modal .linha-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal .rodape { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; z-index: 70;
+    transform: translateX(-50%) translateY(20px);
+    background: #232052; border: 1px solid var(--borda); color: var(--texto);
+    padding: 12px 18px; border-radius: 12px; font-size: 13px;
+    box-shadow: var(--sombra); opacity: 0; pointer-events: none; transition: .25s;
+  }
+  .toast.visivel { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.erro { border-color: rgba(255, 92, 122, .55); }
+
+  /* ---------- login ---------- */
+  .login {
+    position: fixed; inset: 0; z-index: 50;
+    display: none; place-items: center;
+    background: rgba(7, 5, 20, .82); backdrop-filter: blur(6px);
+  }
+  .login.aberto { display: grid; }
+  .login .caixa {
+    width: min(420px, 92vw);
+    background: linear-gradient(160deg, var(--card), var(--card-alto));
+    border: 1px solid var(--borda); border-radius: var(--raio);
+    padding: 26px; box-shadow: var(--sombra);
+  }
+  .login h3 { margin: 0 0 6px; }
+  .login p { color: var(--texto-fraco); font-size: 13px; margin: 0 0 16px; }
+  .login input {
+    width: 100%; padding: 11px 13px; border-radius: 10px;
+    border: 1px solid var(--borda); background: rgba(0, 0, 0, .25);
+    color: var(--texto); font: inherit; margin-bottom: 12px;
+  }
+  .login input:focus { outline: 2px solid rgba(79, 124, 255, .55); }
+  .login .dica { font-size: 11.5px; color: var(--texto-fraco); margin-top: 10px; }
+
+  .carregando { opacity: .45; pointer-events: none; }
+
+  @media (max-width: 1100px) {
+    .col-3 { grid-column: span 6; }
+    .col-4 { grid-column: span 6; }
+    .col-5, .col-7 { grid-column: span 12; }
+  }
+  @media (max-width: 640px) {
+    main { padding: 12px 14px 28px; }
+    .topo { padding: 16px 14px 4px; }
+    .col-3, .col-4 { grid-column: span 12; }
+    .donut-area { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="login" id="telaLogin">
+  <div class="caixa">
+    <h3>Acessar o painel</h3>
+    <p>Informe a chave da API (header <b>X-API-Key</b>). Ela fica no arquivo <code>.env</code>.</p>
+    <input id="campoChave" type="password" placeholder="X-API-Key" autocomplete="off">
+    <button class="botao primario" style="width:100%" id="btnEntrar">Entrar</button>
+    <div class="dica">Padrão de desenvolvimento: <code>dev-local-troque-esta-chave</code></div>
+  </div>
+</div>
+
+<header class="topo">
+  <div>
+    <h1><span class="ponto"></span><span id="titulo">Painel de Assinaturas</span></h1>
+    <div class="sub" id="subtitulo">Carregando dados...</div>
+  </div>
+  <div class="acoes">
+    <button id="btnAtualizar">Atualizar</button>
+    <button class="botao primario" id="btnExportar">Exportar Excel</button>
+    <button id="btnSair" title="Trocar a chave da API">Sair</button>
+  </div>
+</header>
+
+<main id="conteudo">
+  <!-- indicadores principais -->
+  <section class="linha">
+    <article class="card kpi clicavel col-3" style="--cor: var(--azul)" data-filtro-kpi="todos_incluindo_cancelados" title="Ver todos os clientes">
+      <div class="rotulo">Total de assinaturas</div>
+      <div class="valor" id="kpiTotal">-</div>
+      <div class="detalhe" id="kpiTotalDetalhe">&nbsp;</div>
+      <span class="ver-lista">ver lista →</span>
+    </article>
+    <article class="card kpi clicavel col-3" style="--cor: var(--vermelho)" data-filtro-kpi="atraso" title="Ver clientes em atraso">
+      <div class="rotulo">Em atraso</div>
+      <div class="valor" id="kpiAtraso">-</div>
+      <div class="detalhe" id="kpiAtrasoDetalhe">&nbsp;</div>
+      <span class="ver-lista">ver lista →</span>
+    </article>
+    <article class="card kpi clicavel col-3" style="--cor: var(--amarelo)" data-filtro-kpi="vencendo" title="Ver clientes vencendo em 7 dias">
+      <div class="rotulo">Vencendo em 7 dias</div>
+      <div class="valor" id="kpiVencendo">-</div>
+      <div class="detalhe" id="kpiVencendoDetalhe">&nbsp;</div>
+      <span class="ver-lista">ver lista →</span>
+    </article>
+    <article class="card kpi clicavel col-3" style="--cor: var(--verde)" data-filtro-kpi="ativos" title="Ver clientes ativos">
+      <div class="rotulo">Ativas</div>
+      <div class="valor" id="kpiAtivas">-</div>
+      <div class="detalhe" id="kpiAtivasDetalhe">&nbsp;</div>
+      <span class="ver-lista">ver lista →</span>
+    </article>
+  </section>
+
+  <!-- financeiro -->
+  <section class="linha">
+    <article class="card kpi fin col-3" style="--cor: var(--ciano)">
+      <div class="rotulo">Valor da carteira</div>
+      <div class="valor" id="finCarteira">-</div>
+      <div class="detalhe">soma do valor final dos clientes</div>
+    </article>
+    <article class="card kpi fin col-3" style="--cor: var(--verde)">
+      <div class="rotulo">Recebido no mês</div>
+      <div class="valor" id="finRecebido">-</div>
+      <div class="detalhe" id="finRecebidoDetalhe">&nbsp;</div>
+    </article>
+    <article class="card kpi fin col-3" style="--cor: var(--vermelho)">
+      <div class="rotulo">Despesas no mês</div>
+      <div class="valor" id="finDespesas">-</div>
+      <div class="detalhe">lançamentos do tipo despesa</div>
+    </article>
+    <article class="card kpi fin col-3" style="--cor: var(--roxo)">
+      <div class="rotulo">Lucro no mês</div>
+      <div class="valor" id="finLucro">-</div>
+      <div class="detalhe">recebido - despesas</div>
+    </article>
+  </section>
+
+  <!-- gerenciar clientes -->
+  <section class="linha">
+    <article class="card col-12">
+      <div class="topo-secao">
+        <div>
+          <h2>Clientes</h2>
+          <div class="nota" id="notaClientes">carregando...</div>
+        </div>
+        <button class="botao primario" id="btnNovoCliente">+ Novo cliente</button>
+      </div>
+
+      <div class="ferramentas">
+        <input type="search" id="buscaClientes" placeholder="Buscar por nome, usuário, contato ou ID...">
+        <select id="filtroClientes">
+          <option value="todos">Todos (exceto cancelados)</option>
+          <option value="atraso">Em atraso</option>
+          <option value="vencendo">Vencendo em 7 dias</option>
+          <option value="ativos">Ativos</option>
+          <option value="inativos">Inativos / suspensos</option>
+          <option value="cancelados">Cancelados</option>
+          <option value="todos_incluindo_cancelados">Todos, inclusive cancelados</option>
+        </select>
+        <span class="contador" id="contadorClientes"></span>
+      </div>
+
+      <div class="tabela-wrap tabela-clientes">
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th><th>Contato</th><th>Plano</th><th>Vencimento</th>
+              <th>Situação</th><th class="num-tab">Valor</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaClientes"></tbody>
+        </table>
+      </div>
+
+      <div class="paginacao">
+        <span id="infoPagina"></span>
+        <div class="botoes">
+          <button id="pagAnterior">Anterior</button>
+          <button id="pagProxima">Próxima</button>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- graficos -->
+  <section class="linha">
+    <article class="card col-4">
+      <h2>Assinaturas por produto</h2>
+      <div class="nota">distribuição da base</div>
+      <div class="donut-area">
+        <div class="donut" id="donutProduto">
+          <div class="centro"><b id="donutTotal">-</b><span>clientes</span></div>
+        </div>
+        <div class="legenda" id="legendaProduto"></div>
+      </div>
+    </article>
+
+    <article class="card col-4">
+      <h2>Clientes por plano</h2>
+      <div class="nota">5 planos mais usados</div>
+      <div class="barras" id="barrasPlano"></div>
+    </article>
+
+    <article class="card col-4">
+      <h2>Atraso por faixa</h2>
+      <div class="nota">dias desde o vencimento</div>
+      <div class="barras" id="barrasAtraso"></div>
+    </article>
+  </section>
+
+  <section class="linha">
+    <article class="card col-7">
+      <h2>Vencimentos por mês</h2>
+      <div class="nota" id="notaVencimentosMes">datas de vencimento dos clientes</div>
+      <div class="colunas" id="colunasMes"></div>
+    </article>
+
+    <article class="card col-5">
+      <h2>Próximos vencimentos</h2>
+      <div class="nota" id="notaProximos">próximos 30 dias</div>
+      <div class="tabela-wrap">
+        <table>
+          <thead><tr><th>Cliente</th><th>Vencimento</th><th class="num-tab">Valor</th></tr></thead>
+          <tbody id="tabelaProximos"></tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <section class="linha">
+    <article class="card col-12">
+      <h2>Maiores atrasos</h2>
+      <div class="nota">clientes com vencimento mais antigo</div>
+      <div class="tabela-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Cliente</th><th>Contato</th><th>Plano</th><th>Vencimento</th>
+              <th>Atraso</th><th class="num-tab">Valor</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaAtrasos"></tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+</main>
+
+<!-- modal: renovar -->
+<div class="modal" id="modalRenovar">
+  <div class="caixa">
+    <h3>Renovar assinatura</h3>
+    <div class="alvo" id="renovarAlvo"></div>
+    <div class="linha-campos">
+      <div>
+        <label for="renovarDias">Dias</label>
+        <input type="number" id="renovarDias" value="30" min="1" max="3650">
+      </div>
+      <div>
+        <label for="renovarValor">Valor (R$)</label>
+        <input type="number" id="renovarValor" step="0.01" min="0">
+      </div>
+    </div>
+    <label for="renovarForma">Forma de pagamento</label>
+    <select id="renovarForma">
+      <option>PIX</option>
+      <option>DINHEIRO</option>
+      <option>BOLETO</option>
+      <option>DEPOSITO</option>
+      <option>CARTAO</option>
+    </select>
+    <div class="rodape">
+      <button data-fechar>Cancelar</button>
+      <button class="botao primario" id="btnConfirmarRenovar">Renovar</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: novo cliente -->
+<div class="modal" id="modalNovoCliente">
+  <div class="caixa">
+    <h3 id="tituloCliente">Novo cliente</h3>
+    <div class="alvo" id="alvoCliente">preencha os dados da assinatura</div>
+    <div class="linha-campos">
+      <div>
+        <label for="novoNome">Nome *</label>
+        <input id="novoNome" placeholder="Nome do cliente">
+      </div>
+      <div>
+        <label for="novoContato">Contato / WhatsApp</label>
+        <input id="novoContato" placeholder="+55 11 99999-9999">
+      </div>
+    </div>
+    <div class="linha-campos">
+      <div>
+        <label for="novoUsuario">Usuário (login)</label>
+        <input id="novoUsuario" placeholder="usuario do acesso">
+      </div>
+      <div>
+        <label for="novaSenha">Senha</label>
+        <input id="novaSenha" placeholder="senha do acesso">
+      </div>
+    </div>
+    <div class="linha-campos">
+      <div>
+        <label for="novoPlano">Plano</label>
+        <select id="novoPlano"><option value="">— sem plano —</option></select>
+      </div>
+      <div>
+        <label for="novoForma">Forma de pagamento</label>
+        <select id="novoForma">
+          <option>PIX</option>
+          <option>DINHEIRO</option>
+          <option>BOLETO</option>
+          <option>DEPOSITO</option>
+          <option>CARTAO</option>
+        </select>
+      </div>
+    </div>
+    <div class="linha-campos">
+      <div>
+        <label for="novoValor">Valor (R$)</label>
+        <input type="number" id="novoValor" step="0.01" min="0" value="0">
+      </div>
+      <div>
+        <label for="novoDesconto">Desconto (R$)</label>
+        <input type="number" id="novoDesconto" step="0.01" min="0" value="0">
+      </div>
+    </div>
+    <div class="linha-campos">
+      <div>
+        <label for="novoVencimento">Vencimento</label>
+        <input type="date" id="novoVencimento">
+      </div>
+      <div>
+        <label for="novoObs">Observação</label>
+        <input id="novoObs" placeholder="opcional">
+      </div>
+    </div>
+    <div class="rodape">
+      <button data-fechar>Cancelar</button>
+      <button class="botao primario" id="btnSalvarCliente">Criar cliente</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: whatsapp -->
+<div class="modal" id="modalWhatsapp">
+  <div class="caixa">
+    <h3>Enviar mensagem no WhatsApp</h3>
+    <div class="alvo" id="whatsappAlvo"></div>
+    <label for="whatsappTexto">Mensagem (pode editar antes de enviar)</label>
+    <textarea id="whatsappTexto"></textarea>
+    <div class="rodape">
+      <button data-fechar>Cancelar</button>
+      <button class="botao primario" id="btnAbrirWhatsapp">Abrir WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  /* ==========================================================================
+     CONFIGURAÇÃO — mexa aqui para personalizar o painel
+     ========================================================================== */
+  const CONFIG = {
+    titulo: "Painel de Assinaturas",
+    apiBase: "",              // mesma origem; troque se a API estiver em outra porta
+    diasProximos: 30,         // janela de "próximos vencimentos"
+    topPlanos: 5,             // quantos planos mostrar nas barras
+    topAtrasos: 10,           // linhas da tabela de atrasos
+    atualizarSegundos: 60,    // 0 desativa a atualização automática
+    porPagina: 15,            // linhas por pagina na lista de clientes
+    mensagens: {
+      // Mensagem padrao para todos os clientes.
+      // Use *asteriscos* para negrito no WhatsApp e {nome}, {plano}, {vencimento},
+      // {valor}, {dias} para personalizar.
+      padrao: `Olá, {nome}! Tudo bem? 😊
+
+Sou da ConnectTV. Vi que você já teve um plano conosco de internet ilimitada e gostaria de apresentar nossas novidades!
+
+Estamos com novos servidores e serviços, além de uma superpromoção especial para seu retorno: *apenas R$ 10,00 mensais!*
+
+🎁 Oferecemos também *1 dia de teste grátis* para você conhecer nossos serviços.
+
+Qualquer dúvida, estou à disposição! Será um prazer ter você conosco novamente. 😊`,
+      // Opcional: mensagens diferentes para casos especificos.
+      // Deixe vazio ("") para usar a padrao.
+      vencida: "",
+      aVencer: "",
+    },
+  };
+
+  const PALETA = ["#4f7cff", "#2ad4e8", "#8b5cf6", "#2fcf8f", "#f5b83d", "#ff5c7a", "#8ea2ff", "#c084fc"];
+
+  /* ========================================================================== */
+  const $ = (id) => document.getElementById(id);
+  let CHAVE = localStorage.getItem("assinaturas.apiKey") || "";
+
+  const moeda = (v) => (v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const numero = (v) => (v || 0).toLocaleString("pt-BR");
+  const dataBR = (iso) => {
+    if (!iso) return "-";
+    const [a, m, d] = iso.split("-");
+    return `${d}/${m}/${a}`;
+  };
+  const diasDeAtraso = (iso) => {
+    if (!iso) return null;
+    const alvo = new Date(iso + "T00:00:00");
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    return Math.floor((hoje - alvo) / 86400000);
+  };
+  const escapar = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+
+  /* ------------------------------- estado --------------------------------- */
+  const ESTADO = {
+    clientes: [],
+    busca: "",
+    filtro: "todos",
+    pagina: 1,
+    planos: [],
+    alvoRenovar: null,
+    alvoWhats: null,
+    clienteEditando: null,
+    credenciaisOriginais: [],
+  };
+
+  function isoHojeMais(dias) {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(dias || 0));
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  }
+
+  function telefoneWhatsapp(contato) {
+    let digitos = String(contato || "").replace(/\D/g, "");
+    if (!digitos) return null;
+    if (!digitos.startsWith("55")) digitos = "55" + digitos;
+    // 55 + DDD (2) + numero (8 ou 9)
+    if (digitos.length < 12 || digitos.length > 13) return null;
+    return digitos;
+  }
+
+  function toast(texto, erro = false) {
+    const el = $("toast");
+    el.textContent = texto;
+    el.classList.toggle("erro", erro);
+    el.classList.add("visivel");
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => el.classList.remove("visivel"), 3200);
+  }
+
+  async function apiEnviar(caminho, metodo, corpo) {
+    const resposta = await fetch(CONFIG.apiBase + caminho, {
+      method: metodo,
+      headers: { "X-API-Key": CHAVE, "Content-Type": "application/json" },
+      body: corpo ? JSON.stringify(corpo) : undefined,
+    });
+    if (resposta.status === 401) { abrirLogin(); throw new Error("Chave inválida"); }
+    if (!resposta.ok) {
+      let detalhe = `HTTP ${resposta.status}`;
+      try { const dados = await resposta.json(); detalhe = dados.detail || detalhe; } catch (_) {}
+      throw new Error(detalhe);
+    }
+    return resposta.status === 204 ? null : resposta.json().catch(() => null);
+  }
+
+  /* ---------------------------- lista de clientes -------------------------- */
+  function clientesFiltrados() {
+    const termo = ESTADO.busca.trim().toLowerCase();
+    return ESTADO.clientes.filter((c) => {
+      const texto = [c.nome, c.usuario, c.contato, c.codigo_legado].join(" ").toLowerCase();
+      if (termo && !texto.includes(termo)) return false;
+      const dias = c.vencimento ? diasDeAtraso(c.vencimento) : null;
+      const cancelado = c.status === "CANCELADO";
+      switch (ESTADO.filtro) {
+        // "Em atraso" no cartao = vencimento passado e nao cancelado
+        case "atraso": return !cancelado && dias !== null && dias > 0;
+        // "Vencendo em 7 dias" = em dia (ATIVO/TESTE) vencendo de hoje ate daqui a 7 dias
+        case "vencendo": return (c.status === "ATIVO" || c.status === "TESTE")
+          && dias !== null && dias <= 0 && dias >= -7;
+        // "Ativas" no cartao = somente status ATIVO
+        case "ativos": return c.status === "ATIVO";
+        case "inativos": return c.status === "INATIVO" || c.status === "SUSPENSO";
+        case "cancelados": return cancelado;
+        case "todos_incluindo_cancelados": return true;
+        default: return !cancelado;
+      }
+    });
+  }
+
+  function renderizarClientes() {
+    const lista = clientesFiltrados();
+    const porPagina = CONFIG.porPagina;
+    const totalPaginas = Math.max(1, Math.ceil(lista.length / porPagina));
+    if (ESTADO.pagina > totalPaginas) ESTADO.pagina = totalPaginas;
+    const inicio = (ESTADO.pagina - 1) * porPagina;
+    const pagina = lista.slice(inicio, inicio + porPagina);
+
+    $("contadorClientes").textContent = `${numero(lista.length)} encontrados`;
+    $("notaClientes").textContent =
+      `${numero(ESTADO.clientes.length)} assinaturas na base · clique nas ações de cada linha`;
+
+    const alvo = $("tabelaClientes");
+    if (!lista.length) {
+      alvo.innerHTML = '<tr><td colspan="7" class="vazio">Nenhum cliente encontrado com esses filtros.</td></tr>';
+    } else {
+      alvo.innerHTML = pagina.map((c) => {
+        const dias = c.vencimento ? diasDeAtraso(c.vencimento) : null;
+        let rotuloDias = "";
+        if (dias !== null) {
+          rotuloDias = dias > 0 ? `há ${numero(dias)} dias` : dias === 0 ? "vence hoje" : `em ${numero(-dias)} dias`;
+        }
+        const cancelado = c.status === "CANCELADO";
+        const suspenso = c.status === "SUSPENSO";
+        let classe = "verde", texto = "ativo";
+        if (cancelado) { classe = "cinza"; texto = "cancelado"; }
+        else if (suspenso) { classe = "amarelo"; texto = "suspenso"; }
+        else if (c.status === "INATIVO") { classe = "cinza"; texto = "inativo"; }
+        else if (dias !== null && dias > 0) { classe = "vermelho"; texto = "vencido"; }
+        else if (dias !== null && dias <= 7) { classe = "amarelo"; texto = "vencendo"; }
+
+        const telefone = telefoneWhatsapp(c.contato);
+        const rotuloStatus = c.status === "ATIVO" ? "Suspender" : "Ativar";
+        const acaoStatus = c.status === "ATIVO" ? "suspender" : "reativar";
+
+        return `
+          <tr>
+            <td class="cliente">${escapar(c.nome)}<br><small>${escapar(c.usuario || "")}</small></td>
+            <td>${escapar(c.contato || "-")}</td>
+            <td>${escapar(c.plano_nome || "-")}</td>
+            <td>${dataBR(c.vencimento)}<br><small>${rotuloDias}</small></td>
+            <td><span class="pilula ${classe}">${texto}</span></td>
+            <td class="num-tab">${moeda(c.valor_final)}</td>
+            <td>
+              <div class="acoes-linha">
+                <button class="btn-acao renovar" data-acao="renovar" data-id="${c.id}">Renovar</button>
+                <button class="btn-acao editar" data-acao="editar" data-id="${c.id}">Editar</button>
+                <button class="btn-acao ${acaoStatus === "suspender" ? "suspender" : "ativar"}"
+                        data-acao="${acaoStatus}" data-id="${c.id}">${rotuloStatus}</button>
+                <button class="btn-acao zap" data-acao="whatsapp" data-id="${c.id}"
+                        ${telefone ? "" : 'disabled title="Contato sem número válido"'}>WhatsApp</button>
+                <button class="btn-acao excluir" data-acao="excluir" data-id="${c.id}"
+                        ${cancelado ? "disabled" : ""}>Excluir</button>
+              </div>
+            </td>
+          </tr>`;
+      }).join("");
+    }
+
+    $("infoPagina").textContent = lista.length
+      ? `página ${ESTADO.pagina} de ${totalPaginas}`
+      : "nenhum resultado";
+    $("pagAnterior").disabled = ESTADO.pagina <= 1;
+    $("pagProxima").disabled = ESTADO.pagina >= totalPaginas;
+  }
+
+  function clientePorId(id) {
+    return ESTADO.clientes.find((c) => c.id === Number(id));
+  }
+
+  /* ------------------------------- ações ----------------------------------- */
+  $("buscaClientes").addEventListener("input", (e) => {
+    ESTADO.busca = e.target.value;
+    ESTADO.pagina = 1;
+    renderizarClientes();
+  });
+  $("filtroClientes").addEventListener("change", (e) => {
+    ESTADO.filtro = e.target.value;
+    ESTADO.pagina = 1;
+    renderizarClientes();
+  });
+  $("pagAnterior").addEventListener("click", () => { ESTADO.pagina--; renderizarClientes(); });
+  $("pagProxima").addEventListener("click", () => { ESTADO.pagina++; renderizarClientes(); });
+
+  $("tabelaClientes").addEventListener("click", async (evento) => {
+    const botao = evento.target.closest("button[data-acao]");
+    if (!botao) return;
+    const cliente = clientePorId(botao.dataset.id);
+    if (!cliente) return;
+    const acao = botao.dataset.acao;
+
+    if (acao === "renovar") return abrirRenovar(cliente);
+    if (acao === "editar") return abrirEditar(cliente);
+    if (acao === "whatsapp") return abrirWhatsapp(cliente);
+
+    if (acao === "excluir" && !confirm(`Cancelar a assinatura de ${cliente.nome}?`)) return;
+
+    botao.disabled = true;
+    try {
+      if (acao === "suspender") await apiEnviar(`/assinaturas/${cliente.id}/suspender`, "POST");
+      if (acao === "reativar") await apiEnviar(`/assinaturas/${cliente.id}/reativar`, "POST");
+      if (acao === "excluir") await apiEnviar(`/assinaturas/${cliente.id}`, "DELETE");
+      toast(acao === "excluir" ? "Assinatura cancelada." : "Status atualizado.");
+      await carregar();
+    } catch (erro) {
+      toast(erro.message, true);
+      botao.disabled = false;
+    }
+  });
+
+  /* --------------------- atalhos dos indicadores --------------------------- */
+  document.querySelectorAll("[data-filtro-kpi]").forEach((cartao) => {
+    cartao.addEventListener("click", () => {
+      ESTADO.filtro = cartao.dataset.filtroKpi;
+      ESTADO.busca = "";
+      ESTADO.pagina = 1;
+      $("buscaClientes").value = "";
+      $("filtroClientes").value = ESTADO.filtro;
+      renderizarClientes();
+      document.querySelector(".tabela-clientes").closest(".card")
+        .scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  /* --------------------- cliente: novo / editar ---------------------------- */
+  function preencherPlanos() {
+    const select = $("novoPlano");
+    const atual = select.value;
+    select.innerHTML = '<option value="">— sem plano —</option>' + ESTADO.planos.map((p) =>
+      `<option value="${escapar(p.nome)}">${escapar(p.nome)} — ${moeda(p.valor)}</option>`
+    ).join("");
+    select.value = atual;
+  }
+
+  function limparFormularioCliente() {
+    ["novoNome", "novoContato", "novoUsuario", "novaSenha", "novoObs"].forEach((id) => { $(id).value = ""; });
+    $("novoPlano").value = "";
+    $("novoValor").value = "0";
+    $("novoDesconto").value = "0";
+    $("novoForma").value = "PIX";
+    $("novoVencimento").value = isoHojeMais(30);
+  }
+
+  function abrirNovoCliente() {
+    ESTADO.clienteEditando = null;
+    ESTADO.credenciaisOriginais = [];
+    limparFormularioCliente();
+    $("tituloCliente").textContent = "Novo cliente";
+    $("alvoCliente").textContent = "preencha os dados da assinatura";
+    $("btnSalvarCliente").textContent = "Criar cliente";
+    abrirModal("modalNovoCliente");
+    $("novoNome").focus();
+  }
+
+  $("btnNovoCliente").addEventListener("click", abrirNovoCliente);
+
+  async function abrirEditar(cliente) {
+    let detalhe;
+    try {
+      detalhe = await api(`/assinaturas/${cliente.id}`);
+    } catch (erro) {
+      toast(erro.message, true);
+      return;
+    }
+
+    ESTADO.clienteEditando = detalhe;
+    ESTADO.credenciaisOriginais = detalhe.credenciais || [];
+    limparFormularioCliente();
+
+    // se o plano do cliente nao estiver na lista (ex.: inativo), adiciona a opcao
+    const selectPlano = $("novoPlano");
+    if (detalhe.plano_nome && ![...selectPlano.options].some((o) => o.value === detalhe.plano_nome)) {
+      const opcao = document.createElement("option");
+      opcao.value = detalhe.plano_nome;
+      opcao.textContent = detalhe.plano_nome;
+      selectPlano.appendChild(opcao);
+    }
+
+    const primeira = ESTADO.credenciaisOriginais[0];
+    $("novoNome").value = detalhe.nome || "";
+    $("novoContato").value = detalhe.contato || "";
+    $("novoUsuario").value = (primeira && primeira.usuario) || detalhe.usuario || "";
+    $("novaSenha").value = (primeira && primeira.senha) || "";
+    selectPlano.value = detalhe.plano_nome || "";
+    $("novoValor").value = Number(detalhe.valor || 0).toFixed(2);
+    $("novoDesconto").value = Number(detalhe.desconto || 0).toFixed(2);
+    $("novoVencimento").value = detalhe.vencimento || "";
+    $("novoForma").value = detalhe.forma_pagamento || "PIX";
+    $("novoObs").value = detalhe.observacao || "";
+
+    $("tituloCliente").textContent = "Editar cliente";
+    $("alvoCliente").textContent = `#${detalhe.id} · ${detalhe.nome} · ${detalhe.plano_nome || "sem plano"}`;
+    $("btnSalvarCliente").textContent = "Salvar alterações";
+    abrirModal("modalNovoCliente");
+    $("novoNome").focus();
+  }
+
+  $("novoPlano").addEventListener("change", () => {
+    // ao editar, mexer no plano nao deve trocar valor/vencimento sozinho
+    if (ESTADO.clienteEditando) return;
+    const plano = ESTADO.planos.find((p) => p.nome === $("novoPlano").value);
+    if (!plano) return;
+    $("novoValor").value = Number(plano.valor || 0).toFixed(2);
+    $("novoVencimento").value = isoHojeMais(plano.dias || 30);
+  });
+
+  function credenciaisDoFormulario(usuario, senha) {
+    const lista = (ESTADO.credenciaisOriginais || []).map((c) => ({
+      ordem: c.ordem,
+      usuario: c.usuario,
+      senha: c.senha,
+    }));
+    if (lista.length) {
+      lista[0] = {
+        ...lista[0],
+        usuario: usuario || lista[0].usuario,
+        senha: senha || lista[0].senha,
+      };
+      return lista;
+    }
+    return usuario ? [{ ordem: 1, usuario, senha: senha || null }] : [];
+  }
+
+  $("btnSalvarCliente").addEventListener("click", async () => {
+    const nome = $("novoNome").value.trim();
+    if (!nome) { toast("Informe o nome do cliente.", true); $("novoNome").focus(); return; }
+
+    const usuario = $("novoUsuario").value.trim();
+    const corpo = {
+      nome,
+      contato: $("novoContato").value.trim() || null,
+      usuario: usuario || null,
+      plano_nome: $("novoPlano").value || null,
+      valor: Number($("novoValor").value) || 0,
+      desconto: Number($("novoDesconto").value) || 0,
+      vencimento: $("novoVencimento").value || null,
+      forma_pagamento: $("novoForma").value || null,
+      observacao: $("novoObs").value.trim() || null,
+      credenciais: credenciaisDoFormulario(usuario, $("novaSenha").value),
+    };
+
+    const editando = ESTADO.clienteEditando;
+    const botao = $("btnSalvarCliente");
+    botao.disabled = true;
+    try {
+      if (editando) {
+        await apiEnviar(`/assinaturas/${editando.id}`, "PATCH", corpo);
+        fecharModais();
+        toast(`Dados de ${nome} atualizados.`);
+        await carregar();
+      } else {
+        await apiEnviar("/assinaturas", "POST", corpo);
+        fecharModais();
+        toast(`Cliente ${nome} criado.`);
+        ESTADO.busca = nome;
+        ESTADO.filtro = "todos";
+        ESTADO.pagina = 1;
+        $("buscaClientes").value = nome;
+        $("filtroClientes").value = "todos";
+        await carregar();
+      }
+    } catch (erro) {
+      toast(erro.message, true);
+    } finally {
+      botao.disabled = false;
+    }
+  });
+
+  /* ------------------------------ modais ----------------------------------- */
+  function abrirModal(id) { $(id).classList.add("aberto"); }
+  function fecharModais() {
+    document.querySelectorAll(".modal").forEach((m) => m.classList.remove("aberto"));
+    ESTADO.clienteEditando = null;
+  }
+  document.querySelectorAll("[data-fechar]").forEach((b) => b.addEventListener("click", fecharModais));
+  document.querySelectorAll(".modal").forEach((m) => {
+    m.addEventListener("click", (e) => { if (e.target === m) fecharModais(); });
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharModais(); });
+
+  function abrirRenovar(cliente) {
+    ESTADO.alvoRenovar = cliente;
+    $("renovarAlvo").textContent = `${cliente.nome} · ${cliente.plano_nome || "sem plano"} · vence ${dataBR(cliente.vencimento)}`;
+    $("renovarDias").value = 30;
+    $("renovarValor").value = (cliente.valor_final || 0).toFixed(2);
+    abrirModal("modalRenovar");
+    $("renovarDias").focus();
+  }
+
+  $("btnConfirmarRenovar").addEventListener("click", async () => {
+    const cliente = ESTADO.alvoRenovar;
+    if (!cliente) return;
+    const dias = Number($("renovarDias").value) || 30;
+    const valor = Number($("renovarValor").value) || 0;
+    $("btnConfirmarRenovar").disabled = true;
+    try {
+      const resultado = await apiEnviar(`/assinaturas/${cliente.id}/renovar`, "POST", {
+        dias,
+        valor,
+        forma_pagamento: $("renovarForma").value,
+      });
+      fecharModais();
+      toast(`Renovado até ${dataBR(resultado.vencimento_novo)}.`);
+      await carregar();
+    } catch (erro) {
+      toast(erro.message, true);
+    } finally {
+      $("btnConfirmarRenovar").disabled = false;
+    }
+  });
+
+  // Na planilha o "nome" costuma ser o login (ex.: "8DEBORA", "23LEANDRO"),
+  // e o "usuario" costuma ter o nome da pessoa. Esta funcao tenta o nome mais amigavel.
+  function primeiroNome(cliente) {
+    const soLetras = /^[A-Za-zÀ-ÿ]{2,}(?: [A-Za-zÀ-ÿ]{2,}){0,2}$/;
+    const limpar = (texto) => {
+      let t = String(texto || "").split(/\s+/)[0]
+        .replace(/^\d+/, "")          // "8debora" -> "debora"
+        .replace(/[_.\-]+/g, " ")
+        .trim();
+      const digito = t.search(/\d/);
+      if (digito >= 2) t = t.slice(0, digito); // "Lucas54x" -> "Lucas"
+      return t.replace(/\d+$/, "").trim();     // "mari3" -> "mari"
+    };
+    const capitalizar = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
+
+    for (const origem of [cliente.usuario, cliente.nome]) {
+      const candidato = limpar(origem);
+      if (soLetras.test(candidato)) return capitalizar(candidato);
+    }
+    return "";
+  }
+
+  function montarMensagem(cliente) {
+    const dias = cliente.vencimento ? diasDeAtraso(cliente.vencimento) : null;
+    let modelo = CONFIG.mensagens.padrao;
+    if (dias !== null && dias > 0 && CONFIG.mensagens.vencida) modelo = CONFIG.mensagens.vencida;
+    if (dias !== null && dias >= 0 && dias <= 7 && CONFIG.mensagens.aVencer) modelo = CONFIG.mensagens.aVencer;
+
+    const nome = primeiroNome(cliente);
+    let texto = modelo
+      .replaceAll("{nome}", nome)
+      .replaceAll("{plano}", cliente.plano_nome || "")
+      .replaceAll("{vencimento}", dataBR(cliente.vencimento))
+      .replaceAll("{valor}", moeda(cliente.valor_final))
+      .replaceAll("{dias}", String(dias ?? ""));
+
+    if (!nome) texto = texto.replace(/Olá,\s*!/g, "Olá!");
+    return texto;
+  }
+
+  function abrirWhatsapp(cliente) {
+    const telefone = telefoneWhatsapp(cliente.contato);
+    if (!telefone) { toast("Contato sem número válido.", true); return; }
+    ESTADO.alvoWhats = { cliente, telefone };
+    $("whatsappAlvo").textContent = `${cliente.nome} · ${cliente.contato} · +${telefone}`;
+    $("whatsappTexto").value = montarMensagem(cliente);
+    abrirModal("modalWhatsapp");
+  }
+
+  $("btnAbrirWhatsapp").addEventListener("click", () => {
+    const alvo = ESTADO.alvoWhats;
+    if (!alvo) return;
+    const texto = $("whatsappTexto").value;
+    const url = `https://wa.me/${alvo.telefone}?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank", "noopener");
+    fecharModais();
+    toast("WhatsApp aberto em outra aba.");
+  });
+
+  async function api(caminho) {
+    const resposta = await fetch(CONFIG.apiBase + caminho, {
+      headers: { "X-API-Key": CHAVE },
+    });
+    if (resposta.status === 401) {
+      abrirLogin();
+      throw new Error("Chave inválida");
+    }
+    if (!resposta.ok) throw new Error(`Falha em ${caminho}: ${resposta.status}`);
+    return resposta.json();
+  }
+
+  /* ------------------------------- login ---------------------------------- */
+  function abrirLogin() {
+    $("telaLogin").classList.add("aberto");
+    $("campoChave").value = CHAVE;
+    $("campoChave").focus();
+  }
+  function fecharLogin() { $("telaLogin").classList.remove("aberto"); }
+
+  $("btnEntrar").addEventListener("click", () => {
+    const valor = $("campoChave").value.trim();
+    if (!valor) return;
+    CHAVE = valor;
+    localStorage.setItem("assinaturas.apiKey", CHAVE);
+    fecharLogin();
+    carregar();
+  });
+  $("campoChave").addEventListener("keydown", (e) => { if (e.key === "Enter") $("btnEntrar").click(); });
+  $("btnSair").addEventListener("click", () => {
+    localStorage.removeItem("assinaturas.apiKey");
+    CHAVE = "";
+    abrirLogin();
+  });
+
+  /* ----------------------------- renderizacao ------------------------------ */
+  function renderizarIndicadores(d) {
+    $("kpiTotal").textContent = numero(d.total);
+    $("kpiTotalDetalhe").textContent = `${numero(d.canceladas)} canceladas · ${numero(d.suspensas)} suspensas`;
+
+    $("kpiAtraso").textContent = numero(d.vencidas_por_data);
+    const pct = d.total ? Math.round((d.vencidas_por_data / d.total) * 100) : 0;
+    $("kpiAtrasoDetalhe").textContent = `${pct}% da base com vencimento passado`;
+
+    $("kpiVencendo").textContent = numero(d.vencendo_7_dias);
+    $("kpiVencendoDetalhe").textContent = "clientes em dia vencendo nesta semana";
+
+    $("kpiAtivas").textContent = numero(d.ativas);
+    $("kpiAtivasDetalhe").textContent = `${numero(d.inativas)} marcadas como inativas`;
+
+    $("finCarteira").textContent = moeda(d.valor_carteira);
+    $("finRecebido").textContent = moeda(d.recebido_mes);
+    $("finRecebidoDetalhe").textContent = `MRR contratado: ${moeda(d.mrr)}`;
+    $("finDespesas").textContent = moeda(d.despesas_mes);
+    $("finLucro").textContent = moeda(d.lucro_mes);
+    $("finLucro").style.color = d.lucro_mes < 0 ? "var(--vermelho)" : "var(--verde)";
+  }
+
+  function renderizarDonut(dados) {
+    const entradas = Object.entries(dados || {}).sort((a, b) => b[1] - a[1]);
+    const total = entradas.reduce((soma, [, qtd]) => soma + qtd, 0);
+    $("donutTotal").textContent = numero(total);
+
+    if (!total) {
+      $("legendaProduto").innerHTML = '<div class="vazio">Sem dados</div>';
+      return;
+    }
+
+    let acumulado = 0;
+    const partes = entradas.map(([, qtd], i) => {
+      const inicio = (acumulado / total) * 360;
+      acumulado += qtd;
+      const fim = (acumulado / total) * 360;
+      return `${PALETA[i % PALETA.length]} ${inicio.toFixed(2)}deg ${fim.toFixed(2)}deg`;
+    });
+    $("donutProduto").style.background = `conic-gradient(${partes.join(",")})`;
+
+    $("legendaProduto").innerHTML = entradas.map(([nome, qtd], i) => `
+      <div class="item">
+        <span class="marca" style="background:${PALETA[i % PALETA.length]}"></span>
+        <span class="nome" title="${escapar(nome)}">${escapar(nome)}</span>
+        <span class="qtd">${numero(qtd)} <span style="color:var(--texto-fraco)">(${Math.round(qtd / total * 100)}%)</span></span>
+      </div>
+    `).join("");
+  }
+
+  function renderizarBarras(alvo, entradas, opcoes = {}) {
+    const lista = Object.entries(entradas || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, opcoes.limite || 99);
+    const max = Math.max(1, ...lista.map(([, v]) => v));
+    const cor = opcoes.cor || "linear-gradient(90deg, var(--azul), var(--ciano))";
+
+    $(alvo).innerHTML = lista.length
+      ? lista.map(([nome, valor]) => `
+        <div class="linha-barra">
+          <span class="rotulo" title="${escapar(nome)}">${escapar(nome)}</span>
+          <span class="trilho"><span class="preenchimento" style="width:${Math.max(3, valor / max * 100)}%; background:${cor}"></span></span>
+          <span class="num">${numero(valor)}</span>
+        </div>`).join("")
+      : '<div class="vazio">Sem dados</div>';
+  }
+
+  function renderizarColunas(alvo, entradas) {
+    const max = Math.max(1, ...entradas.map(([, v]) => v));
+    $(alvo).innerHTML = entradas.map(([rotulo, valor]) => `
+      <div class="coluna">
+        <div class="barra" style="height:${Math.max(4, (valor / max) * 100)}%">
+          <span class="pico">${numero(valor)}</span>
+        </div>
+        <span class="mes">${escapar(rotulo)}</span>
+      </div>`).join("");
+  }
+
+  function agruparPorMes(assinaturas) {
+    const contagem = new Map();
+    for (const a of assinaturas) {
+      if (!a.vencimento) continue;
+      const chave = a.vencimento.slice(0, 7); // YYYY-MM
+      contagem.set(chave, (contagem.get(chave) || 0) + 1);
+    }
+    const meses = [...contagem.keys()].sort().slice(-10);
+    const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+    return meses.map((chave) => {
+      const [ano, mes] = chave.split("-");
+      return [`${nomes[Number(mes) - 1]}/${ano.slice(2)}`, contagem.get(chave)];
+    });
+  }
+
+  function faixasDeAtraso(assinaturas) {
+    const faixas = {
+      "Em dia": 0, "1-30 dias": 0, "31-90 dias": 0,
+      "91-365 dias": 0, "1-2 anos": 0, "2-3 anos": 0, "3+ anos": 0,
+    };
+    for (const a of assinaturas) {
+      const dias = diasDeAtraso(a.vencimento);
+      if (dias === null) continue;
+      if (dias <= 0) faixas["Em dia"]++;
+      else if (dias <= 30) faixas["1-30 dias"]++;
+      else if (dias <= 90) faixas["31-90 dias"]++;
+      else if (dias <= 365) faixas["91-365 dias"]++;
+      else if (dias <= 730) faixas["1-2 anos"]++;
+      else if (dias <= 1095) faixas["2-3 anos"]++;
+      else faixas["3+ anos"]++;
+    }
+    return Object.fromEntries(Object.entries(faixas).filter(([, v]) => v > 0));
+  }
+
+  function renderizarTabelaAtrasos(lista) {
+    const alvo = $("tabelaAtrasos");
+    if (!lista.length) {
+      alvo.innerHTML = '<tr><td colspan="6" class="vazio">Nenhum registro com vencimento.</td></tr>';
+      return;
+    }
+    alvo.innerHTML = lista.map((a) => {
+      const dias = a.dias_atraso ?? Math.max(0, diasDeAtraso(a.vencimento) || 0);
+      const classe = dias > 365 ? "vermelho" : dias > 30 ? "amarelo" : "azul";
+      return `
+        <tr>
+          <td class="cliente">${escapar(a.nome)}</td>
+          <td>${escapar(a.contato || "-")}</td>
+          <td>${escapar(a.plano || a.plano_nome || "-")}</td>
+          <td>${dataBR(a.vencimento)}</td>
+          <td><span class="pilula ${classe}">${numero(dias)} dias</span></td>
+          <td class="num-tab">${moeda(a.valor_final)}</td>
+        </tr>`;
+    }).join("");
+  }
+
+  function renderizarProximos(lista, total) {
+    $("notaProximos").textContent = total
+      ? `${total} assinatura(s) nos próximos ${CONFIG.diasProximos} dias`
+      : `nenhuma assinatura ativa vencendo nos próximos ${CONFIG.diasProximos} dias`;
+    const alvo = $("tabelaProximos");
+    if (!lista.length) {
+      alvo.innerHTML = '<tr><td colspan="3" class="vazio">Nada por aqui. Todos os registros estão como inativos/vencidos na planilha.</td></tr>';
+      return;
+    }
+    alvo.innerHTML = lista.map((a) => `
+      <tr>
+        <td class="cliente">${escapar(a.nome)}</td>
+        <td>${dataBR(a.vencimento)}</td>
+        <td class="num-tab">${moeda(a.valor_final)}</td>
+      </tr>`).join("");
+  }
+
+  /* -------------------------------- carga ---------------------------------- */
+  async function carregar() {
+    if (!CHAVE) { abrirLogin(); return; }
+    $("conteudo").classList.add("carregando");
+    try {
+      const [painel, proximos, todas, planos] = await Promise.all([
+        api("/dashboard"),
+        api(`/vencimentos?dias=${CONFIG.diasProximos}`),
+        api("/assinaturas?limite=500&ordenar_por=vencimento&ordem=asc"),
+        api("/planos?apenas_ativos=true"),
+      ]);
+
+      ESTADO.planos = planos;
+      preencherPlanos();
+
+      renderizarIndicadores(painel);
+      renderizarDonut(painel.por_produto);
+      renderizarBarras("barrasPlano", painel.por_plano, { limite: CONFIG.topPlanos });
+
+      const assinaturas = todas.itens || [];
+      ESTADO.clientes = assinaturas;
+      renderizarClientes();
+
+      renderizarBarras("barrasAtraso", faixasDeAtraso(assinaturas), {
+        cor: "linear-gradient(90deg, var(--vermelho), var(--amarelo))",
+      });
+      renderizarColunas("colunasMes", agruparPorMes(assinaturas));
+
+      const atrasados = [...assinaturas]
+        .filter((a) => a.vencimento && diasDeAtraso(a.vencimento) > 0)
+        .sort((a, b) => diasDeAtraso(b.vencimento) - diasDeAtraso(a.vencimento))
+        .slice(0, CONFIG.topAtrasos);
+
+      renderizarTabelaAtrasos(atrasados);
+      renderizarProximos(proximos, proximos.length);
+
+      $("titulo").textContent = CONFIG.titulo;
+      $("subtitulo").textContent =
+        `Atualizado às ${new Date().toLocaleTimeString("pt-BR")} · ${numero(painel.total)} assinaturas · ` +
+        `${numero(Object.keys(painel.por_plano || {}).length)} planos`;
+    } catch (erro) {
+      console.error(erro);
+      if (erro.message !== "Chave inválida") {
+        $("subtitulo").textContent = "Erro ao carregar: " + erro.message;
+      }
+    } finally {
+      $("conteudo").classList.remove("carregando");
+    }
+  }
+
+  $("btnAtualizar").addEventListener("click", carregar);
+
+  $("btnExportar").addEventListener("click", async () => {
+    try {
+      const resposta = await fetch(CONFIG.apiBase + "/admin/exportacao/excel", {
+        headers: { "X-API-Key": CHAVE },
+      });
+      if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+      const blob = await resposta.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "assinaturas.xlsx";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (erro) {
+      alert("Não foi possível exportar: " + erro.message);
+    }
+  });
+
+  if (CONFIG.atualizarSegundos > 0) {
+    setInterval(() => { if (CHAVE) carregar(); }, CONFIG.atualizarSegundos * 1000);
+  }
+
+  carregar();
+</script>
+</body>
+</html>
