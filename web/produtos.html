@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Produtos</title>
+<style>
+  :root { --bg:#0d0b21; --card:#1b1740; --borda:rgba(255,255,255,.09); --texto:#eef0ff; --fraco:#9aa0c7;
+          --azul:#4f7cff; --roxo:#8b5cf6; --verde:#2fcf8f; --verm:#ff5c7a; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; font-family:"Segoe UI",system-ui,sans-serif; color:var(--texto);
+         background:linear-gradient(160deg,#0d0b21,#171240 60%,#0f0c29); background-attachment:fixed; }
+  header { display:flex; justify-content:space-between; align-items:center; padding:22px 28px 6px; flex-wrap:wrap; gap:12px; }
+  h1 { margin:0; font-size:24px; }
+  main { padding:16px 28px 36px; display:grid; gap:16px; max-width:900px; }
+  .card { background:var(--card); border:1px solid var(--borda); border-radius:16px; padding:18px 20px; }
+  .card h2 { margin:0 0 4px; font-size:15px; }
+  .nota { color:var(--fraco); font-size:12.5px; margin-bottom:14px; }
+  button, .botao { font:inherit; font-size:13px; cursor:pointer; border-radius:10px; border:1px solid var(--borda);
+         background:rgba(255,255,255,.06); color:var(--texto); padding:9px 16px; text-decoration:none; }
+  button:hover, .botao:hover { background:rgba(255,255,255,.13); }
+  .primario { background:linear-gradient(135deg,var(--azul),var(--roxo)); border:0; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; color:var(--fraco); font-size:11px; text-transform:uppercase; padding:8px 10px; border-bottom:1px solid var(--borda); }
+  td { padding:10px; border-bottom:1px solid rgba(255,255,255,.05); }
+  .pilula { padding:3px 9px; border-radius:99px; font-size:11px; font-weight:600; }
+  .verde { background:rgba(47,207,143,.16); color:var(--verde); }
+  .azul { background:rgba(79,124,255,.16); color:#9db4ff; }
+  .cinza { background:rgba(154,160,199,.14); color:var(--fraco); }
+  .form { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; align-items:end; }
+  label { display:block; font-size:12px; color:var(--fraco); margin-bottom:6px; }
+  input, select { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--borda);
+         background:rgba(0,0,0,.25); color:var(--texto); font:inherit; font-size:13px; }
+  .btn-mini { padding:5px 10px; font-size:11px; margin-right:6px; }
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#232052; border:1px solid var(--borda);
+         padding:12px 18px; border-radius:12px; font-size:13px; opacity:0; transition:.25s; pointer-events:none; }
+  .toast.on { opacity:1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Produtos</h1>
+  <a class="botao" href="/painel">&larr; Voltar ao painel</a>
+</header>
+<main>
+  <section class="card">
+    <h2 id="tituloForm">Novo produto</h2>
+    <div class="nota">Duração fixa: sempre o mesmo número de dias (ex.: IPTV, 30 dias). Flexível: você escolhe os dias em cada renovação (ex.: Internet).</div>
+    <div class="form">
+      <div><label for="nome">Nome</label><input id="nome" placeholder="Ex.: IPTV"></div>
+      <div><label for="tipo">Duração</label>
+        <select id="tipo"><option value="fixa">Fixa</option><option value="flexivel">Flexível</option></select></div>
+      <div><label for="dias" id="rotuloDias">Dias</label><input id="dias" type="number" min="1" max="3650" value="30"></div>
+      <div><label for="ativo">Situação</label>
+        <select id="ativo"><option value="1">Ativo</option><option value="0">Inativo</option></select></div>
+      <div style="display:flex;gap:8px">
+        <button class="primario" id="salvar">Salvar</button>
+        <button id="cancelar" style="display:none">Cancelar</button>
+      </div>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Produtos cadastrados</h2>
+    <div class="nota" id="nota">carregando...</div>
+    <table>
+      <thead><tr><th>Produto</th><th>Duração</th><th>Dias</th><th>Situação</th><th></th></tr></thead>
+      <tbody id="lista"></tbody>
+    </table>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const CHAVE = localStorage.getItem("assinaturas.apiKey") || "";
+  let produtos = [];
+  let editando = null;
+
+  const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+  function aviso(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 3500); }
+
+  async function api(caminho, opcoes = {}) {
+    const r = await fetch(caminho, { ...opcoes, headers: { "Content-Type": "application/json", "X-API-Key": CHAVE } });
+    if (r.status === 401) { aviso("Chave inválida. Volte ao painel e entre novamente."); throw new Error("401"); }
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || r.statusText); }
+    return r.status === 204 ? null : r.json();
+  }
+
+  function atualizarCampoDias() {
+    $("rotuloDias").textContent = $("tipo").value === "fixa" ? "Dias (fixos)" : "Dias padrão (editável na renovação)";
+  }
+
+  function desenhar() {
+    $("nota").textContent = produtos.length + " produto(s)";
+    $("lista").innerHTML = produtos.map((p) => `
+      <tr>
+        <td><b>${esc(p.nome)}</b></td>
+        <td><span class="pilula ${p.duracao_fixa ? "azul" : "cinza"}">${p.duracao_fixa ? "Fixa" : "Flexível"}</span></td>
+        <td>${p.dias}</td>
+        <td><span class="pilula ${p.ativo ? "verde" : "cinza"}">${p.ativo ? "Ativo" : "Inativo"}</span></td>
+        <td><button class="btn-mini" data-editar="${p.id}">Editar</button></td>
+      </tr>`).join("") || '<tr><td colspan="5">Nenhum produto.</td></tr>';
+  }
+
+  async function carregar() {
+    try { produtos = await api("/produtos"); desenhar(); }
+    catch (e) { $("nota").textContent = "Erro ao carregar: " + e.message; }
+  }
+
+  function limpar() {
+    editando = null;
+    $("tituloForm").textContent = "Novo produto";
+    $("nome").value = ""; $("tipo").value = "fixa"; $("dias").value = 30; $("ativo").value = "1";
+    $("cancelar").style.display = "none";
+    atualizarCampoDias();
+  }
+
+  $("tipo").addEventListener("change", atualizarCampoDias);
+  $("cancelar").addEventListener("click", limpar);
+
+  $("lista").addEventListener("click", (ev) => {
+    const id = ev.target.dataset.editar;
+    if (!id) return;
+    const p = produtos.find((x) => x.id === Number(id));
+    editando = p.id;
+    $("tituloForm").textContent = "Editar produto";
+    $("nome").value = p.nome; $("tipo").value = p.duracao_fixa ? "fixa" : "flexivel";
+    $("dias").value = p.dias; $("ativo").value = p.ativo ? "1" : "0";
+    $("cancelar").style.display = "";
+    atualizarCampoDias();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  $("salvar").addEventListener("click", async () => {
+    const corpo = {
+      nome: $("nome").value.trim(),
+      duracao_fixa: $("tipo").value === "fixa",
+      dias: Number($("dias").value) || 30,
+      ativo: $("ativo").value === "1",
+    };
+    if (!corpo.nome) { aviso("Informe o nome do produto."); return; }
+    try {
+      await api(editando ? "/produtos/" + editando : "/produtos", { method: editando ? "PATCH" : "POST", body: JSON.stringify(corpo) });
+      aviso("Produto salvo.");
+      limpar();
+      carregar();
+    } catch (e) { aviso("Erro: " + e.message); }
+  });
+
+  atualizarCampoDias();
+  carregar();
+</script>
+</body>
+</html>

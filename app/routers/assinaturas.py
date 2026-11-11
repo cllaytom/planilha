@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..auditoria import registrar
 from ..database import get_db
-from ..models import Assinatura, Credencial, Lancamento, Plano
+from ..models import Assinatura, Credencial, Lancamento, Plano, Produto
 from ..schemas import (
     AssinaturaCreate,
     AssinaturaOut,
@@ -47,6 +47,16 @@ def _resolver_plano(db: Session, plano_id: int | None, plano_nome: str | None) -
     if plano_nome:
         return db.scalar(select(Plano).where(func.upper(Plano.nome) == plano_nome.strip().upper()))
     return None
+
+
+def _dias_do_produto(db: Session, produto_nome: str | None, dias_pedidos: int | None, dias_plano: int | None) -> int:
+    """Produto de duracao fixa (ex.: IPTV) ignora os dias pedidos; flexivel (ex.: Internet) aceita."""
+    produto = None
+    if produto_nome:
+        produto = db.scalar(select(Produto).where(func.upper(Produto.nome) == produto_nome.strip().upper()))
+    if produto and produto.duracao_fixa:
+        return produto.dias
+    return dias_pedidos or dias_plano or (produto.dias if produto else 30)
 
 
 def _recalcular(ass: Assinatura) -> None:
@@ -154,7 +164,9 @@ def criar(payload: AssinaturaCreate, db: Session = Depends(get_db)):
     if dados.get("valor_final") is None:
         dados["valor_final"] = round(dados["valor"] - (dados.get("desconto") or 0.0), 2)
     if dados.get("vencimento") is None:
-        dados["vencimento"] = date.today() + timedelta(days=plano.dias if plano else 30)
+        produto_nome = dados.get("produto") or (plano.produto if plano else None)
+        dias = _dias_do_produto(db, produto_nome, None, plano.dias if plano else None)
+        dados["vencimento"] = date.today() + timedelta(days=dias)
     if plano:
         dados["plano_id"] = plano.id
         dados["plano_nome"] = dados.get("plano_nome") or plano.nome
@@ -167,6 +179,19 @@ def criar(payload: AssinaturaCreate, db: Session = Depends(get_db)):
     db.add(ass)
     db.flush()
     registrar(db, "assinatura", ass.id, "criacao", depois=dados)
+
+    # cliente ativo ja entra no "recebido no mes"
+    if ass.status == "ATIVO" and (ass.valor_final or 0.0) > 0:
+        db.add(Lancamento(
+            assinatura_id=ass.id,
+            tipo="pagamento",
+            data=date.today(),
+            valor=ass.valor_final,
+            forma_pagamento=ass.forma_pagamento,
+            plano_nome=ass.plano_nome,
+            descricao="Pagamento inicial (automatico)",
+        ))
+
     db.commit()
     db.refresh(ass)
     return ass
@@ -232,7 +257,7 @@ def renovar(assinatura_id: int, payload: RenovacaoIn, db: Session = Depends(get_
         ass.plano_nome = plano.nome
         ass.produto = plano.produto or ass.produto
 
-    dias = payload.dias or (plano.dias if plano else 30)
+    dias = _dias_do_produto(db, ass.produto, payload.dias, plano.dias if plano else None)
     valor = payload.valor if payload.valor is not None else (
         plano.valor if plano and payload.plano_nome else ass.valor_final
     )
